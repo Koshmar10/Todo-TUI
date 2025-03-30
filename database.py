@@ -2,6 +2,7 @@ import sqlite3
 
 DB_FILE = 'tasks.db'
 
+
 def setup_database():
     connection = sqlite3.connect(DB_FILE)
     cursor = connection.cursor()

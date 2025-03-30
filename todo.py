@@ -1,6 +1,7 @@
 import curses
 from datetime import datetime
 import utils
+import shlex
 
 menuWindow = None
 previewWindow = None
@@ -109,40 +110,66 @@ def handle_selection_change(window, preview_window, curr_elem, key_code, project
 
 def decode_cmd(cmdWindow, cmd):
     global projects
-    if cmd is '':
+    cmd.strip()
+    if cmd == '':
         return 1
-    arguments = cmd.split()
+    arguments = shlex.split(cmd, posix=True)
     
     cmd_name = arguments[0] #identify witch command is being used
-    has_args = True if len(arguments) > 1 else False
-    if has_args:
-        #name chack
-        if cmd_name == 'add' and len(arguments) == 3:
-            pass
-        else:
+    match cmd_name:
+        case 'delete':
+            
+            arguments[1] = arguments[1].strip("'")
+            '''
+            cmdWindow.clear()
+            cmdWindow.addstr(1,1, f'{cmd_name} {arguments[1]}')
+            cmdWindow.refresh()
+            curses.napms(2000)
+            '''
+            utils.delete_project(arguments[1])
+            projects = utils.list_projects()
+            display_projects(menuWindow, previewWindow, 0)
+            return 1
+        case 'add':
             if arguments[1] == 'project':
                 display_cmdWindow()
-                #need to probvide title and deadline
-                title = take_input(cmdWindow, '', 'Project tilte')
+                title = take_input(cmdWindow, '', 'Project title')
+                
+                if type(title) == type(True):
+                    cmdWindow.clear()
+                    cmdWindow.addstr(1, 1, f': Operation aborted')
+                    cmdWindow.refresh()
+                    curses.napms(1000)
+                    display_cmdWindow()
+                    return 0
                 cmdWindow.clear()
-                cmdWindow.addstr(1,1, f'Title set to: {title}')
+                cmdWindow.addstr(1, 1, f'Title set to: {title}')
                 cmdWindow.refresh()
                 curses.napms(800)
                 display_cmdWindow()
                 cmdWindow.refresh()
                 deadline = take_input(cmdWindow, '', 'Project deadline( YYYY-MM-DD hh:mm )')
+                
+                if type(deadline) == type(True):
+                    cmdWindow.clear()
+                    cmdWindow.addstr(1, 1, f': Operation aborted')
+                    cmdWindow.refresh()
+                    curses.napms(1000)
+                    display_cmdWindow()
+                    return 0
+                
                 while not utils.is_valid_deadline(deadline):
-                    deadline = take_input(cmdWindow, '', 'Incorect format try again( YYYY-MM-DD hh:mm )')
+                    deadline = take_input(cmdWindow, '', 'Incorrect format, try again ( YYYY-MM-DD hh:mm )')
                 cmdWindow.clear()
-                cmdWindow.addstr(1,1, f'Deadline set to: {deadline}')
+                cmdWindow.addstr(1, 1, f'Deadline set to: {deadline}')
                 cmdWindow.refresh()
                 curses.napms(800)
                 display_cmdWindow()
                 cmdWindow.refresh()
                 utils.add_project(title, deadline)
-                                    
-
-                
+                projects = utils.list_projects()
+                display_projects(menuWindow, previewWindow, len(projects) - 1)
+                return 1
             elif arguments[1] == 'projects':
                 pass
             elif arguments[1] == 'task':
@@ -156,25 +183,22 @@ def decode_cmd(cmdWindow, cmd):
                 curses.napms(500)
                 display_cmdWindow()
                 return 1
-            
-    else:
-        if cmd_name == 'today':
-            filtr ='today'
+        case 'today':
+            filtr = 'today'
             projects = utils.list_projects(filtr)
             display_projects(menuWindow, previewWindow, 0)
             return 0
-        elif cmd_name == 'reset':
+        case 'reset':
             filtr = ''
             projects = utils.list_projects()
             display_projects(menuWindow, previewWindow, 0)
             return 0
-        elif cmd_name == 'priority':
+        case 'priority':
             filtr = 'priority'
             projects = utils.list_projects(filtr)
             display_projects(menuWindow, previewWindow, 0)
             return 0
-            
-        else:
+        case _:
             display_cmdWindow()
             cmdWindow.addstr(1, 2, 'Unrecognized command')
             cmdWindow.refresh()
@@ -202,7 +226,7 @@ def display_cmdWindow():
 
 def take_input(window, cmd, custom_msg=''):
     window.clear()
-    window.addstr(1, 1, f'{custom_msg}:')
+    window.addstr(1, 1, f'{custom_msg}: {cmd if cmd != '' else ''}')
     window.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
     window.refresh()
     while (ch := window.getch()) not in (10, curses.KEY_ENTER):  # Check for Enter key
@@ -297,7 +321,7 @@ def main():
                 if  type(inpt) == type(True):
                     escaped = inpt
                 elif type(inpt) == type('a'):
-                    cmd+=inpt
+                    cmd=inpt
                     cmdWindow.clear()
                     if cmd:
                         cmdWindow.addstr(1, 1, f': {cmd}')
