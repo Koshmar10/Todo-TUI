@@ -1,10 +1,12 @@
 import curses
+from datetime import datetime
 import utils
 
 menuWindow = None
 previewWindow = None
 cmdWindow = None
 projects= []
+filtr=''
 appWindows = {
     'menu' : menuWindow,
     'preview' : previewWindow,
@@ -107,6 +109,8 @@ def handle_selection_change(window, preview_window, curr_elem, key_code, project
 
 def decode_cmd(cmdWindow, cmd):
     global projects
+    if cmd is '':
+        return 1
     arguments = cmd.split()
     
     cmd_name = arguments[0] #identify witch command is being used
@@ -118,6 +122,27 @@ def decode_cmd(cmdWindow, cmd):
         else:
             if arguments[1] == 'project':
                 display_cmdWindow()
+                #need to probvide title and deadline
+                title = take_input(cmdWindow, '', 'Project tilte')
+                cmdWindow.clear()
+                cmdWindow.addstr(1,1, f'Title set to: {title}')
+                cmdWindow.refresh()
+                curses.napms(800)
+                display_cmdWindow()
+                cmdWindow.refresh()
+                deadline = take_input(cmdWindow, '', 'Project deadline( YYYY-MM-DD hh:mm )')
+                while not utils.is_valid_deadline(deadline):
+                    deadline = take_input(cmdWindow, '', 'Incorect format try again( YYYY-MM-DD hh:mm )')
+                cmdWindow.clear()
+                cmdWindow.addstr(1,1, f'Deadline set to: {deadline}')
+                cmdWindow.refresh()
+                curses.napms(800)
+                display_cmdWindow()
+                cmdWindow.refresh()
+                utils.add_project(title, deadline)
+                                    
+
+                
             elif arguments[1] == 'projects':
                 pass
             elif arguments[1] == 'task':
@@ -134,15 +159,18 @@ def decode_cmd(cmdWindow, cmd):
             
     else:
         if cmd_name == 'today':
-            projects = utils.list_projects('today')
+            filtr ='today'
+            projects = utils.list_projects(filtr)
             display_projects(menuWindow, previewWindow, 0)
             return 0
         elif cmd_name == 'reset':
+            filtr = ''
             projects = utils.list_projects()
             display_projects(menuWindow, previewWindow, 0)
             return 0
         elif cmd_name == 'priority':
-            projects = utils.list_projects('priority')
+            filtr = 'priority'
+            projects = utils.list_projects(filtr)
             display_projects(menuWindow, previewWindow, 0)
             return 0
             
@@ -152,6 +180,7 @@ def decode_cmd(cmdWindow, cmd):
             cmdWindow.refresh()
             curses.napms(500)
             display_cmdWindow()
+            return 1
 
 def handle_cmd(cmd, cmdwindow, menuWindow, previewWindow):
     cmd = cmd.strip()
@@ -170,13 +199,32 @@ def display_cmdWindow():
     cmdWindow.addch(1,1, ':')
     cmdWindow.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
     cmdWindow.refresh()
+
+def take_input(window, cmd, custom_msg=''):
+    window.clear()
+    window.addstr(1, 1, f'{custom_msg}:')
+    window.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
+    window.refresh()
+    while (ch := window.getch()) not in (10, curses.KEY_ENTER):  # Check for Enter key
+        if ch == 27:
+            return True
+        if ch in (8, 127, curses.KEY_BACKSPACE):
+            cmd = cmd[:-1]  # Remove the last character from the string
+        else:
+            cmd += chr(ch)
+        window.clear()
+        window.addstr(1, 1, f'{custom_msg}: {cmd}')
+        window.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
+        window.refresh()
+    return cmd
     
 
 
 def main():
-    global menuWindow, previewWindow, cmdWindow, projects
+    global menuWindow, previewWindow, cmdWindow, projects, filtr
     app = curses.initscr()
     projects = utils.list_projects()
+    filtr=''
 
     curses.noecho()
     curses.curs_set(0)
@@ -233,34 +281,32 @@ def main():
             focused_panel = menuWindow
             display_projects(focused_panel, previewWindow, focused_porject)
         if key == ord(':'):
-            end_key=0
             exit_code=1
             firsIter=True
             display_cmdWindow()
-            while end_key != 27:
+            end_key = cmdWindow.getch()
+            while end_key != 27 and end_key not in (10, curses.KEY_ENTER):
                 cmd = ''
                 escaped=False
-                if not firsIter:
-                    cmd+=chr(end_key)
+                cmd+=chr(end_key)
+                cmdWindow.clear()
+                cmdWindow.addstr(1, 1, f': {cmd}')
+                cmdWindow.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
+                cmdWindow.refresh()
+                inpt = take_input(cmdWindow, cmd)
+                if  type(inpt) == type(True):
+                    escaped = inpt
+                elif type(inpt) == type('a'):
+                    cmd+=inpt
                     cmdWindow.clear()
-                    cmdWindow.addstr(1, 1, f': {cmd}')
-                    cmdWindow.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
-                    cmdWindow.refresh()
-                
-                while (ch := cmdWindow.getch()) not in (10, curses.KEY_ENTER):  # Check for Enter key
-                    if ch == 27:
-                        escaped=True
-                        break
-                    if ch in (8, 127, curses.KEY_BACKSPACE):
-                        cmd = cmd[:-1]  # Remove the last character from the string
-                    else:
-                        cmd += chr(ch)
-                    cmdWindow.clear()
-                    cmdWindow.addstr(1, 1, f': {cmd}')
+                    if cmd:
+                        cmdWindow.addstr(1, 1, f': {cmd}')
                     cmdWindow.border(' ', ' ', 0, ' ', curses.ACS_LLCORNER, curses.ACS_LRCORNER, ' ', ' ')
                     cmdWindow.refresh()
                 if not escaped:
                     exit_code =handle_cmd(cmd, cmdWindow, menuWindow, previewWindow)
+                else:
+                    break
                 if exit_code == 0:
                     cmdWindow.clear()
                     previewWindow.refresh()
@@ -271,6 +317,9 @@ def main():
                 display_cmdWindow()
                 end_key = cmdWindow.getch()
                 firsIter=False
+            cmdWindow.clear()
+            cmdWindow.refresh()
+            display_projects(menuWindow, previewWindow, focused_porject, filtr)
         app.refresh()
 
 curses.wrapper(lambda screen: main())

@@ -1,3 +1,4 @@
+import datetime
 import database
 import sqlite3
 
@@ -59,6 +60,14 @@ def list_tasks(project_id):
         status = "✔" if task_completed else "❌"
         tasks.append((task_title, task_description, task_completed))
     return tasks
+def is_valid_deadline(deadline):
+    try:
+        # Try to parse the deadline with the expected format
+        datetime.datetime.strptime(deadline, '%Y-%m-%d %H:%M')
+        return True
+    except ValueError:
+        # If parsing fails, the format is incorrect
+        return False
 
 def purge():
     conn = sqlite3.connect(database.DB_FILE)
