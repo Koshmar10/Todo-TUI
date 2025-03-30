@@ -15,19 +15,37 @@ def add_task(project_id, title, description, completed):
     conn.commit()
     conn.close()
 
-def list_projects():
+def list_projects(filtr=''):
     conn = sqlite3.connect(database.DB_FILE)
     cursor = conn.cursor()
     projects = []
-    cursor.execute('''
-        SELECT projects.name, projects.deadline
-        FROM projects''')
+    if filtr == '':
+        cursor.execute('''
+            SELECT projects.name, projects.deadline
+            FROM projects''')
+    elif filtr == 'today':
+        cursor.execute(
+            '''
+            SELECT projects.name, projects.deadline
+            FROM projects
+            WHERE DATE(projects.deadline) = DATE('now')
+            '''
+        )
+    elif filtr == 'priority':
+        cursor.execute(
+            '''
+            SELECT projects.name, projects.deadline
+            FROM projects
+            ORDER BY projects.deadline ASC
+            '''
+        )
     for row in cursor.fetchall():
         project_name, deadline = row
         #print(project_name, deadline)
-        projects.append(project_name)
+        projects.append((project_name, deadline))
     conn.close()
     return projects
+
 def list_tasks(project_id):
     conn = sqlite3.connect(database.DB_FILE)
     cursor = conn.cursor()
@@ -50,7 +68,8 @@ def purge():
     conn.close()
 if __name__ == '__main__':
     #dd_project('Fortnite sex', '2025-08-28 23:59')
-    #add_project('droguri', '2026-04-01 23:59')
+    #add_project('wqeq', '2025-03-32 23:59')
+    #add_project('qweqw', '2025-03-38 23:59')
     #list_projects()
     #list_tasks(0)
     #purge()
